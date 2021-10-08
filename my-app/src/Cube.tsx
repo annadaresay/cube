@@ -1,5 +1,5 @@
 import { gql, useQuery, useSubscription } from "@apollo/client";
-import React, { useEffect } from "react";
+import React, { useCallback, useMemo } from "react";
 import Cube3d from "react-3d-cube";
 import "./App.css";
 
@@ -36,23 +36,19 @@ const subscribe = gql`
   }
 `;
 
-const getColor = (id: string, cube: Cube) => {
-  const side = cube.sides.find((side) => side.id === id);
+const getColor = (id: string, cube?: Cube) => {
+  const side = cube?.sides.find((side) => side.id === id);
 
   if (!side) {
-    return undefined;
+    return `rgba(255, 255, 255, 1)`;
   }
 
   return `rgba(${side.red}, ${side.green}, ${side.blue}, 1)`;
 };
 
-const CubeSide = ({ cube, id }: { cube: Cube; id: string }) => {
-  const color = getColor(id, cube);
-
-  return (
-    <div style={{ background: color, width: "100%", height: "100%" }}></div>
-  );
-};
+const CubeSide = ({ color }: { color: string }) => (
+  <div style={{ background: color, width: "100%", height: "100%" }}></div>
+);
 
 export const Cube = () => {
   const { data: initial } = useQuery<{ cube: Cube }>(get);
@@ -60,9 +56,33 @@ export const Cube = () => {
 
   const cube = updated?.cubeChange ?? initial?.cube;
 
-  useEffect(() => {
-    console.log("new cube: ", cube);
-  }, [cube]);
+  // Update colors when we get new cube data
+  const colors = useMemo(
+    () => ({
+      up: getColor("up", cube),
+      down: getColor("down", cube),
+      left: getColor("left", cube),
+      right: getColor("right", cube),
+      back: getColor("back", cube),
+      front: getColor("front", cube),
+    }),
+    [cube]
+  );
+
+  // Force a new cube to get generated when colors are changed (we need to do this because of lib limitations)
+  const ColoredCube = useCallback(
+    () => (
+      <Cube3d size={300} index="cube" key={Math.random()}>
+        <CubeSide color={colors.up} />
+        <CubeSide color={colors.down} />
+        <CubeSide color={colors.left} />
+        <CubeSide color={colors.right} />
+        <CubeSide color={colors.back} />
+        <CubeSide color={colors.front} />
+      </Cube3d>
+    ),
+    [colors]
+  );
 
   if (!cube) {
     return null;
@@ -76,14 +96,7 @@ export const Cube = () => {
           height: 300,
         }}
       >
-        <Cube3d size={300} index="front">
-          <CubeSide cube={cube} id="up" />
-          <CubeSide cube={cube} id="down" />
-          <CubeSide cube={cube} id="left" />
-          <CubeSide cube={cube} id="right" />
-          <CubeSide cube={cube} id="back" />
-          <CubeSide cube={cube} id="front" />
-        </Cube3d>
+        <ColoredCube />
       </div>
     </div>
   );
